@@ -5,6 +5,7 @@
 mcmcanType g_mcmcan;
 
 IFX_INTERRUPT(canfd_isr_rxbuff, 0, ISR_PRIORITY_CANFD_RXBUFF);
+IFX_INTERRUPT(canfd_isr_rxfifo0, 0, ISR_PRIORITY_CANFD_RXFIFO0);
 IFX_INTERRUPT(canfd_isr_txbuff, 0, ISR_PRIORITY_CANFD_TXBUFF);
 
 
@@ -24,6 +25,19 @@ void canfd_isr_rxbuff(void)
 
     Hw_Gpio_Toggle(rxBufferId+3);
 }
+
+void canfd_isr_rxfifo0(void)
+{
+    IfxCan_Node_clearInterruptFlag(g_mcmcan.canNode.node, IfxCan_Interrupt_rxFifo0NewMessage);
+
+    g_mcmcan.rxMsg.readFromRxFifo0 = TRUE;
+    g_mcmcan.rxMsg.readFromRxFifo1 = FALSE;
+
+    IfxCan_Can_readMessage(&g_mcmcan.canNode, &g_mcmcan.rxMsg, (uint32*)&g_mcmcan.rxData[0]);
+
+    Hw_Gpio_Toggle(_GPIO_CH7);
+}
+
 
 void canfd_isr_txbuff(void)
 {
@@ -48,8 +62,9 @@ void Hw_Canfd_Init(void)
     g_mcmcan.canNodeConfig.txConfig.dedicatedTxBuffersNumber = 1;
     g_mcmcan.canNodeConfig.txConfig.txBufferDataFieldSize = IfxCan_DataFieldSize_64;
 
-    g_mcmcan.canNodeConfig.rxConfig.rxMode =IfxCan_RxMode_dedicatedBuffers;
+    g_mcmcan.canNodeConfig.rxConfig.rxMode = IfxCan_RxMode_sharedAll;
     g_mcmcan.canNodeConfig.rxConfig.rxBufferDataFieldSize = IfxCan_DataFieldSize_64;
+    g_mcmcan.canNodeConfig.rxConfig.rxFifo0Size = 8;
 
     IfxCan_Can_Pins canPins = {
         .rxPin      = &IfxCan_RXD00B_P20_7_IN,
@@ -67,13 +82,24 @@ void Hw_Canfd_Init(void)
     g_mcmcan.canNodeConfig.interruptConfig.reint.interruptLine = IfxCan_InterruptLine_0;
 
 
+    g_mcmcan.canNodeConfig.interruptConfig.rxFifo0NewMessageEnabled = TRUE;
+    g_mcmcan.canNodeConfig.interruptConfig.rxf0n.priority = ISR_PRIORITY_CANFD_RXFIFO0;
+    g_mcmcan.canNodeConfig.interruptConfig.rxf0n.typeOfService = IfxSrc_Tos_cpu0;
+    g_mcmcan.canNodeConfig.interruptConfig.rxf0n.interruptLine = IfxCan_InterruptLine_1;
+
+
     g_mcmcan.canNodeConfig.interruptConfig.transmissionCompletedEnabled = TRUE;
     g_mcmcan.canNodeConfig.interruptConfig.traco.priority = ISR_PRIORITY_CANFD_TXBUFF;
     g_mcmcan.canNodeConfig.interruptConfig.traco.typeOfService = IfxSrc_Tos_cpu0;
-    g_mcmcan.canNodeConfig.interruptConfig.traco.interruptLine = IfxCan_InterruptLine_1;
+    g_mcmcan.canNodeConfig.interruptConfig.traco.interruptLine = IfxCan_InterruptLine_2;
 
     /*add*/
-    g_mcmcan.canNodeConfig.filterConfig.standardListSize = 3;
+    g_mcmcan.canNodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_standard;
+    g_mcmcan.canNodeConfig.filterConfig.standardListSize =  CANFD_RXBUFF_NUM + CANFD_RXFIFO0_NUM;
+    g_mcmcan.canNodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
+    g_mcmcan.canNodeConfig.filterConfig.standardFilterForNonMatchingFrames = IfxCan_NonMatchingFrame_reject;
+
+
 
     IfxCan_Can_initNode(&g_mcmcan.canNode, &g_mcmcan.canNodeConfig);
 
@@ -85,7 +111,6 @@ void Hw_Canfd_Init(void)
     g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_0;
     IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
 
-    /*add*/
     g_mcmcan.canFilter.number = 1;
     g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
     g_mcmcan.canFilter.id1 = 0x101;
@@ -93,7 +118,6 @@ void Hw_Canfd_Init(void)
     g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_1;
     IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
 
-    /*add*/
     g_mcmcan.canFilter.number = 2;
     g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
     g_mcmcan.canFilter.id1 = 0x102;
@@ -101,5 +125,50 @@ void Hw_Canfd_Init(void)
     g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_2;
     IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
 
+    g_mcmcan.canFilter.number = 3;
+    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+    g_mcmcan.canFilter.id1 = 0x200;
+    g_mcmcan.canFilter.id2 = 0x202;
+    g_mcmcan.canFilter.type = IfxCan_FilterType_dualId;
+    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+
+    g_mcmcan.canFilter.number = 4;
+    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+    g_mcmcan.canFilter.id1 = 0x204;
+    g_mcmcan.canFilter.id2 = 0x206;
+    g_mcmcan.canFilter.type = IfxCan_FilterType_range;
+    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+
+    g_mcmcan.canFilter.number = 5;
+    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+    g_mcmcan.canFilter.id1 = 0x210;
+    g_mcmcan.canFilter.id2 = 0x7FF;
+    g_mcmcan.canFilter.type = IfxCan_FilterType_classic;
+    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+
 }
+
+
+
+
+/*
+ * 어떤 CAN Module을 사용할 것 인가?  CAN0
+ * m어떤 CAN Node를 사용할 것 인가?  NODE0
+ * Frame Type은 ?  Both
+ * Frame Mode는? fd long and fast
+ * 통신 속도는?  Arbitration / Data    500k, 2M
+ * Tx 모드   dedicated 3개
+ * Tx Data field size  64byte
+ * Rx 모드  IfxCan_RxMode_sharedAll
+ * Rx Data field size  64Byte
+ * Rx fifo size  8
+ * Filter standardListSize
+* IfxCan_NonMatchingFrame_reject
+* Remote frame reject
+* Pin assign
+Interrupt 설정
+노드 초기화
+필터 추가
+ *
+ * */
 
