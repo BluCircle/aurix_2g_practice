@@ -32,6 +32,7 @@
 #define CANFD_FASTBAUDRATE                 2000000
 #define CANFD_RXBUFF_NUM                   3
 #define CANFD_RXFIFO0_NUM                  3
+#define CANFD_FILTER_NUM                   CANFD_RXBUFF_NUM+CANFD_RXFIFO0_NUM
 
 
 /* Interrupt Priorities */

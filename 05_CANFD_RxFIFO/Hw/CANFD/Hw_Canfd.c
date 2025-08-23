@@ -4,6 +4,30 @@
 
 mcmcanType g_mcmcan;
 
+
+/*
+ * typedef struct
+{
+    uint8                             number;
+    IfxCan_FilterElementConfiguration elementConfiguration;
+    IfxCan_FilterType                 type;
+    uint32                            id1;
+    uint32                            id2;
+    IfxCan_RxBufferId                 rxBufferOffset;
+} IfxCan_Filter;
+*/
+
+IfxCan_Filter g_canfilter_tbl[CANFD_FILTER_NUM]=
+{
+        {0,IfxCan_FilterElementConfiguration_storeInRxBuffer,IfxCan_FilterType_none,0x100,0x0,IfxCan_RxBufferId_0},
+        {1,IfxCan_FilterElementConfiguration_storeInRxBuffer,IfxCan_FilterType_none,0x101,0x0,IfxCan_RxBufferId_1},
+        {2,IfxCan_FilterElementConfiguration_storeInRxBuffer,IfxCan_FilterType_none,0x102,0x0,IfxCan_RxBufferId_2},
+        {3,IfxCan_FilterElementConfiguration_storeInRxFifo0,IfxCan_FilterType_dualId,0x200,0x0202,0},
+        {4,IfxCan_FilterElementConfiguration_storeInRxFifo0,IfxCan_FilterType_range,0x204,0x206,0},
+        {5,IfxCan_FilterElementConfiguration_storeInRxFifo0,IfxCan_FilterType_classic,0x210,0x7FC,0}
+};
+
+
 IFX_INTERRUPT(canfd_isr_rxbuff, 0, ISR_PRIORITY_CANFD_RXBUFF);
 IFX_INTERRUPT(canfd_isr_rxfifo0, 0, ISR_PRIORITY_CANFD_RXFIFO0);
 IFX_INTERRUPT(canfd_isr_txbuff, 0, ISR_PRIORITY_CANFD_TXBUFF);
@@ -20,6 +44,8 @@ void canfd_isr_rxbuff(void)
         rxBufferId++;
     }
 
+    g_mcmcan.rxMsg.readFromRxFifo0 = FALSE;
+    g_mcmcan.rxMsg.readFromRxFifo1 = FALSE;
     g_mcmcan.rxMsg.bufferNumber = rxBufferId;
     IfxCan_Can_readMessage(&g_mcmcan.canNode, &g_mcmcan.rxMsg, (uint32*)&g_mcmcan.rxData[0]);
 
@@ -32,7 +58,6 @@ void canfd_isr_rxfifo0(void)
 
     g_mcmcan.rxMsg.readFromRxFifo0 = TRUE;
     g_mcmcan.rxMsg.readFromRxFifo1 = FALSE;
-
     IfxCan_Can_readMessage(&g_mcmcan.canNode, &g_mcmcan.rxMsg, (uint32*)&g_mcmcan.rxData[0]);
 
     Hw_Gpio_Toggle(_GPIO_CH7);
@@ -104,47 +129,60 @@ void Hw_Canfd_Init(void)
     IfxCan_Can_initNode(&g_mcmcan.canNode, &g_mcmcan.canNodeConfig);
 
 
-    g_mcmcan.canFilter.number = 0;
-    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
-    g_mcmcan.canFilter.id1 = 0x100;
-    g_mcmcan.canFilter.type = IfxCan_FilterType_none;
-    g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_0;
-    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
-
-    g_mcmcan.canFilter.number = 1;
-    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
-    g_mcmcan.canFilter.id1 = 0x101;
-    g_mcmcan.canFilter.type = IfxCan_FilterType_none;
-    g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_1;
-    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
-
-    g_mcmcan.canFilter.number = 2;
-    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
-    g_mcmcan.canFilter.id1 = 0x102;
-    g_mcmcan.canFilter.type = IfxCan_FilterType_none;
-    g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_2;
-    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
-
-    g_mcmcan.canFilter.number = 3;
-    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
-    g_mcmcan.canFilter.id1 = 0x200;
-    g_mcmcan.canFilter.id2 = 0x202;
-    g_mcmcan.canFilter.type = IfxCan_FilterType_dualId;
-    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
-
-    g_mcmcan.canFilter.number = 4;
-    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
-    g_mcmcan.canFilter.id1 = 0x204;
-    g_mcmcan.canFilter.id2 = 0x206;
-    g_mcmcan.canFilter.type = IfxCan_FilterType_range;
-    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
-
-    g_mcmcan.canFilter.number = 5;
-    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
-    g_mcmcan.canFilter.id1 = 0x210;
-    g_mcmcan.canFilter.id2 = 0x7FF;
-    g_mcmcan.canFilter.type = IfxCan_FilterType_classic;
-    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+    for(int i = 0 ; i < CANFD_FILTER_NUM ; i++)
+    {
+        g_mcmcan.canFilter.number = g_canfilter_tbl[i].number;
+        g_mcmcan.canFilter.elementConfiguration = g_canfilter_tbl[i].elementConfiguration;
+        g_mcmcan.canFilter.id1 = g_canfilter_tbl[i].id1;
+        g_mcmcan.canFilter.id2 = g_canfilter_tbl[i].id2;
+        g_mcmcan.canFilter.type = g_canfilter_tbl[i].type;
+        g_mcmcan.canFilter.rxBufferOffset = g_canfilter_tbl[i].rxBufferOffset;
+        IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+    }
+//
+//
+//
+//    g_mcmcan.canFilter.number = 0;
+//    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
+//    g_mcmcan.canFilter.id1 = 0x100;
+//    g_mcmcan.canFilter.type = IfxCan_FilterType_none;
+//    g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_0;
+//    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+//
+//    g_mcmcan.canFilter.number = 1;
+//    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
+//    g_mcmcan.canFilter.id1 = 0x101;
+//    g_mcmcan.canFilter.type = IfxCan_FilterType_none;
+//    g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_1;
+//    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+//
+//    g_mcmcan.canFilter.number = 2;
+//    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxBuffer;
+//    g_mcmcan.canFilter.id1 = 0x102;
+//    g_mcmcan.canFilter.type = IfxCan_FilterType_none;
+//    g_mcmcan.canFilter.rxBufferOffset = IfxCan_RxBufferId_2;
+//    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+//
+//    g_mcmcan.canFilter.number = 3;
+//    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+//    g_mcmcan.canFilter.id1 = 0x200;
+//    g_mcmcan.canFilter.id2 = 0x202;
+//    g_mcmcan.canFilter.type = IfxCan_FilterType_dualId;
+//    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+//
+//    g_mcmcan.canFilter.number = 4;
+//    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+//    g_mcmcan.canFilter.id1 = 0x204;
+//    g_mcmcan.canFilter.id2 = 0x206;
+//    g_mcmcan.canFilter.type = IfxCan_FilterType_range;
+//    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
+//
+//    g_mcmcan.canFilter.number = 5;
+//    g_mcmcan.canFilter.elementConfiguration = IfxCan_FilterElementConfiguration_storeInRxFifo0;
+//    g_mcmcan.canFilter.id1 = 0x210;
+//    g_mcmcan.canFilter.id2 = 0x7FC;
+//    g_mcmcan.canFilter.type = IfxCan_FilterType_classic;
+//    IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
 
 }
 
