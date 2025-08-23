@@ -18,6 +18,7 @@ IfxCan_Filter g_canfilter_tbl[CANFD_FILTER_NUM]=
 IFX_INTERRUPT(canfd_isr_rxbuff, 0, ISR_PRIORITY_CANFD_RXBUFF);
 IFX_INTERRUPT(canfd_isr_rxfifo0, 0, ISR_PRIORITY_CANFD_RXFIFO0);
 IFX_INTERRUPT(canfd_isr_txbuff, 0, ISR_PRIORITY_CANFD_TXBUFF);
+IFX_INTERRUPT(canfd_isr_busoff, 0, ISR_PRIORITY_CANFD_BUSOFF);
 
 
 void canfd_isr_rxbuff(void)
@@ -53,6 +54,15 @@ void canfd_isr_rxfifo0(void)
 
 void canfd_isr_txbuff(void)
 {
+
+}
+
+void canfd_isr_busoff(void)
+{
+    IfxCan_Node_clearInterruptFlag(g_mcmcan.canNode.node, IfxCan_Interrupt_busOffStatus);
+
+    if(g_mcmcan.canNode.node->CCCR.B.INIT != 0)
+        g_mcmcan.canNode.node->CCCR.B.INIT = 0;
 
 }
 
@@ -105,6 +115,12 @@ void Hw_Canfd_Init(void)
     g_mcmcan.canNodeConfig.interruptConfig.traco.typeOfService = IfxSrc_Tos_cpu0;
     g_mcmcan.canNodeConfig.interruptConfig.traco.interruptLine = IfxCan_InterruptLine_2;
 
+    g_mcmcan.canNodeConfig.interruptConfig.busOffStatusEnabled = TRUE;
+    g_mcmcan.canNodeConfig.interruptConfig.boff.priority = ISR_PRIORITY_CANFD_BUSOFF;
+    g_mcmcan.canNodeConfig.interruptConfig.boff.typeOfService = IfxSrc_Tos_cpu0;
+    g_mcmcan.canNodeConfig.interruptConfig.boff.interruptLine = IfxCan_InterruptLine_3;
+
+
     g_mcmcan.canNodeConfig.filterConfig.messageIdLength = IfxCan_MessageIdLength_standard;
     g_mcmcan.canNodeConfig.filterConfig.standardListSize =  CANFD_RXBUFF_NUM + CANFD_RXFIFO0_NUM;
     g_mcmcan.canNodeConfig.filterConfig.rejectRemoteFramesWithStandardId = TRUE;
@@ -123,7 +139,24 @@ void Hw_Canfd_Init(void)
         g_mcmcan.canFilter.rxBufferOffset = g_canfilter_tbl[i].rxBufferOffset;
         IfxCan_Can_setStandardFilter(&g_mcmcan.canNode, &g_mcmcan.canFilter);
     }
+}
 
 
+void Hw_Can_Transmit_data(uint8* data)
+{
+    IfxCan_Status status;
+    IfxCan_Can_initMessage(&g_mcmcan.txMsg);
+
+    g_mcmcan.txMsg.messageId = MY_CAN_ID;
+    g_mcmcan.txMsg.messageIdLength = IfxCan_MessageIdLength_standard;
+    g_mcmcan.txMsg.frameMode = IfxCan_FrameMode_fdLongAndFast;
+    g_mcmcan.txMsg.dataLengthCode = IfxCan_DataLengthCode_64;
+    g_mcmcan.txMsg.bufferNumber = 0;
+
+    // 데이터를 32비트 단위로 변환해서 txData에 저장
+    memcpy(g_mcmcan.txData, data, 64); // 전제: Data는 64바이트
+
+    // CAN 데이터 전송 (uint32* 형으로 캐스팅 필요)
+    status = IfxCan_Can_sendMessage(&g_mcmcan.canNode, &g_mcmcan.txMsg, (uint32*)&g_mcmcan.txData[0]);
 }
 
