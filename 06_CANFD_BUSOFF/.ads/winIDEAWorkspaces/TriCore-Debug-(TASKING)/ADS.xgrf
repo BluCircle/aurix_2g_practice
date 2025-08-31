@@ -181,16 +181,16 @@
         <ViewType>Document</ViewType>
        </__.3>
        <__.4>
-        <ViewId>1</ViewId>
-        <ViewType>Output_Progress</ViewType>
-       </__.4>
-       <__.5>
-        <ViewId>0</ViewId>
-        <ViewType>Symbols</ViewType>
-       </__.5>
-       <__.6>
         <ViewId>6</ViewId>
         <ViewType>Document</ViewType>
+       </__.4>
+       <__.5>
+        <ViewId>1</ViewId>
+        <ViewType>Output_Progress</ViewType>
+       </__.5>
+       <__.6>
+        <ViewId>0</ViewId>
+        <ViewType>Symbols</ViewType>
        </__.6>
       </AllViewBaseData>
       <DocumentViews>
@@ -330,7 +330,7 @@
       <PrimaryDocumentPaneId>4</PrimaryDocumentPaneId>
       <Frames>
        <__.0>
-        <FocusedViewId>6</FocusedViewId>
+        <FocusedViewId>5</FocusedViewId>
         <FrameState>3</FrameState>
         <IsPrimary>true</IsPrimary>
         <Bounds>
@@ -376,7 +376,7 @@
              <IsPinned>false</IsPinned>
              <IsTabbed>true</IsTabbed>
              <Orientation>None</Orientation>
-             <TopTabViewId>6</TopTabViewId>
+             <TopTabViewId>5</TopTabViewId>
              <ViewId>-1</ViewId>
              <Children>
               <__.0>
